@@ -1,0 +1,193 @@
+---
+title: "South Africa Security"
+author: "Ivan Musebe"
+date: "4/12/2023"
+output: html_document
+---
+# _`South Africa Security Analysis (2015 - 2023)`_
+
+## _`Set Working Directory`_
+Set working directory for ease of access of the necessary files.
+```{r}
+setwd("~/Documents/GitHub/denaco-analytics/R") 
+# change to "~denaco-analytics/R" if project downloaded in root folder
+```
+
+Install the required libaries for the environment:
+```{r}
+install.packages(
+  c('sf', 'tidyr', 'dplyr', 'tibble', 'leaflet',
+  'janitor', 'plotly', 'classInt', 'lubridate', 'IRdisplay', 
+  'tidyverse', 'htmlwidgets', 'RColorBrewer', 'leaflet.extras',
+  'leaflet.providers'),
+  repos='http://cran.us.r-project.org')
+```
+
+Load the libraries to make the functions and tools provided by each library available for use in your R code.
+Note: Explain the functions of each library
+```{r}
+# load libraries:
+library(sf)
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(plotly)
+library(leaflet)
+library(janitor)
+library(classInt)
+library(lubridate)
+library(IRdisplay)
+library(tidyverse)
+library(htmlwidgets)
+library(RColorBrewer)
+library(leaflet.extras)
+library(leaflet.providers)
+```
+
+## _`Data`_
+### Load data:
+The data used in the analysis is extracted from the [ACLED](https://acleddata.com/) database. ACLED is a platform that records ongoing live incidents of crime, protests, terrorism and intercommunal violence across the world.
+Our data is for South Africa incidents dated January 01 2015 - March 31 2023
+```{r}
+df <- read.csv(
+  "South_Africa_Security_Incidents 2015-2023.csv",
+  header = TRUE, na.strings = ""
+)
+```
+
+### About the Data
+#### Structure of the data
+To know the structure of the data we will use the function `str()` to know the variables in our object and the data types of each variable.
+```{r}
+str(df)
+```
+Our data contains the security incidents information;
+  a. Where,
+  b. When,
+  c. What &
+  d. How an incident occured
+The data also shows the actors in an incidents and the fatalities in each incident,if any.
+This is the data we are going to analyze.
+
+## Cleaning Data
+### Missing values
+The [ACLED Codebook](https://acleddata.com/acleddatanew/wp-content/uploads/2021/11/ACLED_Codebook_v1_January-2021.pdf) guides us on the key variables.
+As noted on the structure of the data "actor 2", "assoc_actor_2" have have a large number of missing values as well as "civil targeting".
+We have 6610 records. Searching through for their actial figures might prove time consuming and hence we will procede and drop them asa method of dealing with missing values.
+```{r}
+# Make a copy of the data
+df_copy <- data.frame(df)
+
+# subset droping the columns
+df_copy <- subset(df_copy, select = -c(11, 12, 15))
+```
+
+### Feature engineering
+#### Dates
+The dates column is written in two formarts
+  1. %d-%m-%y &
+  2. %d %M %Y for the months of April
+Using the code below, format the date to a single format:
+```{r}
+# Function that changes multiple date formats to a single format
+multidate <- function(data, formats){
+    a<-list()
+    for(i in 1:length(formats)){
+        a[[i]]<- as.Date(data,format=formats[i])
+        a[[1]][!is.na(a[[i]])]<-a[[i]][!is.na(a[[i]])]
+        }
+    a[[1]]
+    }
+
+# Format the date variable (event_date)
+df_copy$event_date <- multidate(
+  df_copy$event_date,
+  # input the date formats in the data
+  c("%d-%b-%y","%d %B %Y")
+)
+```
+Using the dates, now in the right format we can have timeseries charts of security trends.
+
+From the date variable we can produce the month,week of the year (woy) and day of the week.
+```{r cars}
+df_copy <- df_copy %>%
+            add_column(
+                month = format(df_copy$event_date, "%b"),
+                week = paste(lubridate::isoweek(df_copy$event_date), sep = ""),
+                day = weekdays(df_copy$event_date, abbreviate = TRUE),
+                .after = "year"
+            )
+```
+
+#### Geocodinates
+Use the Google geocoding API to map the longitudes and latitudes of each location.
+```{r}
+# _Input geocode API key
+register_google(key = "xxxxxxxxxx") #(For subscription)
+
+Co
+Address <- df_copy[, c("location", "country")] %>% unite("Address" , c("location", "country"), sep = ",", na.rm = TRUE)
+
+for(i in 1:nrow(df_copy)){
+  loc_coord <- data.frame(
+    tryCatch(
+      geocode(Address$Address[i], output = "latlona",source = "google"),
+      warning = function(w) data.frame(lon = NA, lat = NA)
+    )
+  )
+  df_copy$latitude[i] <- as.numeric(loc_coord[2])
+  df_copy$longitude[i] <- as.numeric(loc_coord[1])
+      
+}
+```
+
+View clean data
+```{r}
+head(df_copy)
+```
+ 
+ ### Save data
+```{r}
+write.csv(df_copy, file = "clean_SA_incidents 2015-2023", row.names = FALSE)
+```
+
+## _`Statistics & Visualizations`_
+In this section we will derive descriptive statistics and visualize them.
+One can analyse the data using the following real time questions
+
+### 1. What is the trend of security incidents in South Africa?
+```{r}
+df_copy %>%
+    group_by(month = lubridate::floor_date(event_date, 'month'))  %>%
+    summarise(total_count =n(), .groups = 'drop') %>%
+  plot_ly(x = ~month, y = ~total_count, type = "scatter",
+          text = ~total_count, textposition = "upper right",
+          line = list(color = c("red")),
+          marker = list(color = c("#2c1429")),
+          width = 650, height = 500) %>%
+    layout(plot_bgcolor="#f6f6f6",
+           paper_bgcolor="#f6f6f6",
+          #  font = list(family = "calibri", size = 14),
+           xaxis = list(title = "",
+                        zeroline = FALSE),
+           yaxis = list(title = "Count",
+                        zeroline = FALSE))
+```
+
+### 2. How many incidents occured each year?
+```{r}
+df_copy %>%
+    group_by(year)  %>%
+    summarise(total_count =n(), .groups = 'drop') %>%
+  plot_ly(x = ~as.factor(year), y = ~total_count, type = "bar",
+          text = ~total_count, textposition = "outside",
+          marker = list(color = c("red")),
+          width = 650, height = 500) %>%
+    layout(plot_bgcolor="#f6f6f6",
+           paper_bgcolor="#f6f6f6",
+          #  font = list(family = "calibri", size = 14),
+           xaxis = list(title = "Year",
+                        zeroline = FALSE),
+           yaxis = list(title = "Count",
+                        zeroline = FALSE))
+```
