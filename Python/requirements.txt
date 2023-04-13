@@ -9,3 +9,4 @@ IPython
 # re
 # codecs
 sentence-transformers
+wordcloud
