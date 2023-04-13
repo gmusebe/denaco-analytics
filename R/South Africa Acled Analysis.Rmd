@@ -2,7 +2,9 @@
 title: "South Africa Security"
 author: "Ivan Musebe"
 date: "4/12/2023"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 # _`South Africa Security Analysis (2015 - 2023)`_
 
@@ -335,10 +337,17 @@ To make this more clear, let's produce a heatmap for each province.
 #### Provicial heatmap
 ```{r}
 # Determine the number of incidents per location
-count_location <- as.data.frame(table(df$location))
-matching_rows <- df_copy$location %in% count_location$Var1
-df_copy$count_location <- count_location$Freq[matching_rows]
+add_location_count <- function(df) {
+  df %>%
+    count(location) %>%
+    rename(count_location = n) %>%
+    right_join(df, by = "location") %>%
+    replace_na(list(count_location = 0))
+}
+
+df_copy <- add_location_count(df_copy)
 ```
+
 
 Heatmap
 ```{r}
