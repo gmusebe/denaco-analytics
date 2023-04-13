@@ -292,11 +292,79 @@ df_copy[which(
 ```
 
 ### Maps
+Import the South Africa administratice boundary shapefiles
+The data can be downloaded from the [Humanitarian Data Exchange](https://data.humdata.org/dataset/cod-ab-zaf) database
+```{r}
+# South Africa Admin0
+sa_admin <- st_read(
+  "shapefiles/zaf_admbnda_adm0_sadb_ocha_20201109.shp",
+  stringsAsFactors = FALSE
+)
+
+# Provinces
+sa_provinces <- st_read(
+  "shapefiles/zaf_admbnda_adm1_sadb_ocha_20201109.shp",
+  stringsAsFactors = FALSE
+)
+
+# Districts
+sa_districts <- st_read(
+  "shapefiles/zaf_admbnda_adm2_sadb_ocha_20201109.shp",
+  stringsAsFactors = FALSE
+)
+```
 #### Overview of incidents occurence in South Africa
 ```{r}
+leaflet(df_copy) %>%
+  addTiles() %>%
+  addPolygons(
+    data = sa_admin,
+    color = "red",
+    weight = 1, opacity = 1,
+    fillColor = "red",
+    fillOpacity = 0.1,
+    smoothFactor = 0.5
+  )  %>%
+  addCircles(
+    ~longitude, ~latitude,
+    opacity = .2, col = "blue"
+  )
+```
+Majority of the incidents occur on the west and north west part of South Africa. A number of incidents are noted on the south east as well.
+To make this more clear, let's produce a heatmap for each province.
+#### Provicial heatmap
+```{r}
+# Determine the number of incidents per location
+count_location <- as.data.frame(table(df$location))
+matching_rows <- df_copy$location %in% count_location$Var1
+df_copy$count_location <- count_location$Freq[matching_rows]
 ```
 
-
+Heatmap
+```{r}
+leaflet(df_copy, options = leafletOptions(width = "800px", height = "900px")) %>%
+  addTiles() %>%
+  addPolygons(
+    data = sa_provinces,
+    color = "red",
+    weight = 1, opacity = 1,
+    fillColor = "red",
+    fillOpacity = 0.01,
+    smoothFactor = 0.5,
+    group = "Nig"
+  )  %>%
+  addHeatmap(
+    ~longitude, ~latitude,
+    intensity = ~count_location,
+    max = 360
+  ) %>%
+  addTiles(group = "OSM") %>%
+  addProviderTiles("CartoDB.DarkMatter", group = "Carto") %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Carto"), 
+    overlayGroups = c("philly")
+  )
+```
 
 
 
