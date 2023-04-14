@@ -2,11 +2,7 @@ numpy
 pandas
 matplotlib
 seaborn
-# datatable
 seaborn
 IPython
-# collections
-# re
-# codecs
 sentence-transformers
 wordcloud
