@@ -279,7 +279,7 @@ df_copy[which(
     type = "bar",
     text = ~total_count, textposition = "outside",
     textfont = list(color = '#000000'),
-    width = 650, height = 900
+    width = 650, height = 600
   )  %>%
   layout(
     plot_bgcolor="#f6f6f6",
